@@ -1,0 +1,12 @@
+{
+  "name": "enlarge-arabic",
+  "version": "0.1.0",
+  "description": "Chrome extension that enlarges Arabic text on any website (even inside mixed-language pages) for better readability",
+  "homepage": "",
+  "private": true,
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "webpack --config webpack/webpack.config.cjs"
+  },
+  "type": "module"
+}
