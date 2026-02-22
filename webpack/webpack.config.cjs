@@ -4,10 +4,16 @@
 // https://webpack.js.org/plugins/copy-webpack-plugin/
 const CopyPlugin = require("copy-webpack-plugin");
 
+// https://github.com/webpack/css-minimizer-webpack-plugin
+// https://webpack.js.org/plugins/css-minimizer-webpack-plugin/
+const CssMinimizerPlugin = require("css-minimizer-webpack-plugin");
+const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+
 //
 const path = require('path');
 
 module.exports = {
+
     mode: "production", // https://webpack.js.org/configuration/mode/ // TODO: change to 'production' in production
     // mode: "development", // https://webpack.js.org/configuration/mode/
     // https://webpack.js.org/configuration/devtool/
@@ -20,6 +26,7 @@ module.exports = {
         content: path.resolve(__dirname, "..", "src", "content/content.ts"),
         // sidepanel: path.resolve(__dirname, "..", "src", "sidepanel/sidepanel.tsx"),
         // options: path.resolve(__dirname, "..", "src", "options/options.tsx"),
+        // css: path.resolve(__dirname, "..", "src", "content/css.css")
     },
     output: {
         // Clean the output directory before emit
@@ -45,6 +52,13 @@ module.exports = {
                 // in exclude we are telling webpack not to traverse through the node_modules dependencies
                 exclude: /node_modules/,
             },
+            {
+                test: /\.s?css$/,
+                use: [
+                    MiniCssExtractPlugin.loader,
+                    "css-loader",
+                ],
+            },
         ],
     },
     plugins: [
@@ -54,5 +68,20 @@ module.exports = {
                 {from: "public", to: "../dist"},
             ],
         }),
+        // This plugin extracts CSS into separate files
+        new MiniCssExtractPlugin({
+            filename: '[name].css',
+        }),
     ],
+    // Optimization settings for production
+    optimization: {
+        minimize: true,
+        minimizer: [
+            // For webpack 5+, use the '...' syntax to extend existing minimizers
+            // (like the default TerserPlugin for JS).
+            '...',
+            // Use CssMinimizerPlugin for CSS optimization
+            new CssMinimizerPlugin(),
+        ],
+    },
 };

@@ -12,6 +12,10 @@ npm pkg set 'scripts.build'='webpack --config webpack/webpack.config.cjs';
 # Copies individual files or entire directories, which already exist, to the build directory.
 npm install --save-dev copy-webpack-plugin
 
+# CssMinimizerWebpackPlugin
+# https://webpack.js.org/plugins/css-minimizer-webpack-plugin/
+npm install --save-dev css-loader mini-css-extract-plugin css-minimizer-webpack-plugin
+
 # (if needed) html-webpack-plugin
 # https://www.npmjs.com/package/html-webpack-plugin
 # https://webpack.js.org/plugins/html-webpack-plugin/

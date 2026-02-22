@@ -12,6 +12,9 @@
   "devDependencies": {
     "@types/chrome": "^0.1.37",
     "copy-webpack-plugin": "^13.0.1",
+    "css-loader": "^7.1.4",
+    "css-minimizer-webpack-plugin": "^7.0.4",
+    "mini-css-extract-plugin": "^2.10.0",
     "ts-loader": "^9.5.4",
     "typescript": "^5.9.3",
     "webpack": "^5.105.2",

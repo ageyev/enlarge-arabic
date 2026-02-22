@@ -1,7 +1,12 @@
+// https://stackoverflow.com/questions/49996456/importing-json-file-in-typescript
+import manifest from "../../public/manifest.json";
+
 import {disabledIcon, enabledIcon} from "../constants";
 import messageType from "../messages/messageType";
+import Tab = chrome.tabs.Tab;
+import OnUpdatedInfo = chrome.tabs.OnUpdatedInfo;
 
-console.log("background.js started");
+console.info(manifest.name + " " + manifest.version + " background.js started");
 
 type TabData = { enabled: boolean };
 
@@ -10,12 +15,12 @@ function normalizeHostname(url:string) {
     return hostname.replace(/^www\./, "");
 }
 
-chrome.action.onClicked.addListener(async (tab) => {
+// On click
+chrome.action.onClicked.addListener(async (tab:Tab) => {
 
     if (tab.id && tab.url) {
 
         const storageKey:string = normalizeHostname(tab.url); // << hostname
-
         const tabData:{[key:string]:TabData} = await chrome.storage.local.get(storageKey);
 
         // The ?? operator in TypeScript is the nullish coalescing operator.
@@ -41,5 +46,29 @@ chrome.action.onClicked.addListener(async (tab) => {
         console.error("No tab.id or tab.url found");
         return;
     }
+});
+
+
+// Tab navigation — re-applies state when the user navigates within a domain
+chrome.tabs.onUpdated.addListener(async (tabId: number, changeInfo: OnUpdatedInfo, tab:Tab) => {
+    // Only act when the page has finished loading
+    if (changeInfo.status !== "complete" || !tab.url) return;
+
+    const storageKey:string = normalizeHostname(tab.url); // << hostname
+    const tabData:{[key:string]:TabData} = await chrome.storage.local.get(storageKey);
+
+    // The ?? operator in TypeScript is the nullish coalescing operator.
+    // It is used to provide a default value only when the left-hand side operand is explicitly null or undefined
+    const enabled:boolean = tabData[storageKey]?.enabled ?? false;
+
+
+    if (enabled) {
+        await chrome.tabs.sendMessage(tabId, {action: "toggle", enabled: true});
+    }
+
+    await chrome.action.setIcon({
+        tabId: tab.id,
+        path: enabled ? enabledIcon : disabledIcon
+    });
 
 });
