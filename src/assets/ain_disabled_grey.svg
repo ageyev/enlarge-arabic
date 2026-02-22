@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="512" height="512" viewBox="0 0 512 512"
+     aria-label="Arabic letter icon" role="img">
+  <!-- Transparent background by default (no rect). -->
+  <text x="256" y="270"
+        text-anchor="middle" dominant-baseline="middle"
+        font-size="380" font-weight="800"
+        fill="#8A8F98"
+        style="font-family: 'Noto Naskh Arabic','Noto Sans Arabic','Amiri','Scheherazade New','Arial',sans-serif;">
+    ﻉ
+  </text>
+</svg>

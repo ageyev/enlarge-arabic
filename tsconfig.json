@@ -1,0 +1,29 @@
+// see:
+// https://www.typescriptlang.org/docs/handbook/tsconfig-json.html
+// https://betterprogramming.pub/creating-chrome-extensions-with-typescript-914873467b65
+//
+{
+  // https://www.typescriptlang.org/tsconfig#compilerOptions
+  "compilerOptions": {
+    "strict": true, // https://www.typescriptlang.org/tsconfig#strict
+    // module:
+    // https://www.typescriptlang.org/docs/handbook/modules/theory.html#the-module-output-format
+    // https://www.typescriptlang.org/tsconfig#module
+    // https://www.typescriptlang.org/docs/handbook/modules/guides/choosing-compiler-options.html
+    // "module": "nodenext", // (default: commonjs) https://www.typescriptlang.org/tsconfig#module //
+    "module": "esnext",
+    // "moduleResolution": "nodenext", // https://www.typescriptlang.org/tsconfig#moduleResolution
+    "moduleResolution": "bundler", // https://www.typescriptlang.org/tsconfig#moduleResolution
+    "resolveJsonModule": true, // https://stackoverflow.com/questions/49996456/importing-json-file-in-typescript
+    "target": "esnext", // https://www.typescriptlang.org/tsconfig#target
+    "esModuleInterop": true, // https://www.typescriptlang.org/tsconfig#esModuleInterop
+    "sourceMap": true, //
+    "rootDir": "src",
+    "outDir": "dist",
+    "noEmitOnError": true,
+    "jsx": "react-jsx", // https://www.typescriptlang.org/tsconfig#jsx
+    "typeRoots": [
+      "node_modules/@types",
+    ],
+  }
+}
