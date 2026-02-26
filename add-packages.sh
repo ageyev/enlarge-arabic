@@ -16,10 +16,12 @@ npm install --save-dev copy-webpack-plugin
 # https://webpack.js.org/plugins/css-minimizer-webpack-plugin/
 npm install --save-dev css-loader mini-css-extract-plugin css-minimizer-webpack-plugin
 
-# (if needed) html-webpack-plugin
+# html-webpack-plugin
 # https://www.npmjs.com/package/html-webpack-plugin
 # https://webpack.js.org/plugins/html-webpack-plugin/
-# npm i --save-dev html-webpack-plugin
+# HtmlMinimizerWebpackPlugin
+# https://webpack.js.org/plugins/html-minimizer-webpack-plugin/
+npm install --save-dev html-webpack-plugin html-minimizer-webpack-plugin
 
 # TypeScript and Webpack TypeScript loader
 # https://webpack.js.org/guides/typescript/
