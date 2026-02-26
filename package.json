@@ -1,6 +1,6 @@
 {
   "name": "enlarge-arabic",
-  "version": "0.1.0",
+  "version": "0.2.3",
   "description": "Chrome extension that enlarges Arabic text on any website (even inside mixed-language pages) for better readability",
   "homepage": "",
   "private": true,

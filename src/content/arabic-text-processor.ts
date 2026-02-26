@@ -58,13 +58,23 @@
  * DYNAMIC CONTENT HANDLING
  * ------------------------
  * Modern web pages load content dynamically (infinite scroll, AJAX, SPAs).
- * A MutationObserver watches for added DOM nodes and processes them.
+ * The MutationObserver that handles dynamic content is managed by the
+ * content script (content.ts), NOT by this module. This module provides
+ * processSubtree() and processAddedNode() as the processing entry points
+ * that the observer calls.
  *
- * The observer uses a disconnect/reconnect pattern to prevent the infinite
- * feedback loop that plagued Wudooh (GitHub Issue #23): our own DOM
- * modifications (inserting spans) trigger mutations, which would trigger
- * processing, which would insert more spans, ad infinitum. By disconnecting
- * before modifications and reconnecting after, we break this cycle.
+ * This separation keeps the processor testable as a pure DOM library
+ * without Chrome API dependencies, scheduling APIs (requestAnimationFrame),
+ * or page lifecycle knowledge. The content script handles orchestration:
+ * when to observe, when to re-process, coordination with SPA navigation,
+ * message handling, and storage access.
+ *
+ * The observer uses a disconnect/reconnect pattern (implemented in
+ * content.ts) to prevent the infinite feedback loop that plagued Wudooh
+ * (GitHub Issue #23): our own DOM modifications (inserting spans) trigger
+ * mutations, which would trigger processing, which would insert more
+ * spans, ad infinitum. By disconnecting before modifications and
+ * reconnecting after, the content script breaks this cycle.
  *
  * Additionally, our wrapper spans carry a data attribute (DATA_MARKER).
  * The TreeWalker's filter rejects these spans' subtrees via FILTER_REJECT,
@@ -104,8 +114,10 @@
  *
  * EXPORTED API
  * ------------
- *   enlargeArabicText()      — wraps Arabic runs, starts observer
- *   restoreOriginalText()    — unwraps spans, stops observer, normalizes DOM
+ *   enlargeArabicText()      — wraps Arabic runs (observer managed by content.ts)
+ *   restoreOriginalText()    — unwraps spans, normalizes DOM (observer managed by content.ts)
+ *   processSubtree(root)     — processes a subtree (used by content.ts for SPA re-scan)
+ *   processAddedNode(node)   — processes a single added/changed node (used by content.ts observer)
  *   applySettings(settings)  — updates CSS custom properties (O(1))
  *   clearSettings()          — removes CSS custom properties
  *   isCurrentlyEnlarged()    — returns current state (for sync with background)
@@ -117,12 +129,14 @@
 // ============================================================================
 // CONSTANTS
 // ============================================================================
+import {devMode} from "../constants";
+
 /** Minimum target: ES2018 (guaranteed by MV3 browser requirements).
  *  Non-global — avoids lastIndex statefulness. */
 const ARABIC_TEST = /\p{Script_Extensions=Arabic}/u;
 
 /** Global — for exec() loop over all runs.
- *  MUST reset lastIndex = 0 before each use. */
+ *  MUST reset the lastIndex = 0 before each use. */
 const ARABIC_RUNS = /\p{Script_Extensions=Arabic}+/gu;
 
 /**
@@ -263,6 +277,8 @@ const DEFAULT_SETTINGS: Readonly<ArabicEnlargerSettings> = {
  * Partial settings are accepted: omitted fields retain their current
  * values (or fall back to defaults if never set).
  */
+
+// ---- not implemented yet TODO: add support for changing CSS values
 export function applySettings(settings: Partial<ArabicEnlargerSettings>): void {
     const resolved: ArabicEnlargerSettings = { ...DEFAULT_SETTINGS, ...settings };
     const root = document.documentElement;
@@ -293,16 +309,7 @@ export function clearSettings(): void {
 // ============================================================================
 
 /**
- * The MutationObserver instance, or null when not observing.
- *
- * Lifecycle:
- *   null → created in startObserving() → disconnected/reconnected during
- *   mutation handling → set to null in stopObserving()
- */
-let observer: MutationObserver | null = null;
-
-/**
- * Whether Arabic text is currently enlarged.
+ * Whether the Arabic text is currently enlarged.
  *
  * Guards against double-enlargement (calling enlargeArabicText() twice
  * would wrap already-wrapped text in additional spans) and against
@@ -520,7 +527,8 @@ function wrapArabicRuns(textNode: Text): void {
  *               initial processing, or a specific Element for
  *               MutationObserver callbacks.
  */
-function processSubtree(root: Node): void {
+export function processSubtree(root: Node): void {
+
     const walker = createArabicTextWalker(root);
 
     // Pass 1: collect all Arabic text nodes
@@ -529,11 +537,103 @@ function processSubtree(root: Node): void {
         arabicTextNodes.push(walker.currentNode as Text);
     }
 
+    if (devMode){
+        console.log("[enlarge arabic] text nodes found:", arabicTextNodes.length);
+    }
+
     // Pass 2: wrap Arabic runs in each collected node
     for (const textNode of arabicTextNodes) {
         wrapArabicRuns(textNode);
     }
 }
+
+// ============================================================================
+// OBSERVER ENTRY POINT — processing a single added/changed node
+// ============================================================================
+
+/**
+ * Processes a single node observed by the MutationObserver in content.ts.
+ *
+ * Handles both Element and Text nodes with appropriate skip checks.
+ * This function encapsulates all the DOM-level knowledge that the observer
+ * callback needs, keeping Chrome-extension-level orchestration in content.ts
+ * and DOM-level logic here in the processor.
+ *
+ * WHY NOT JUST EXPORT wrapArabicRuns AND LET content.ts CALL IT DIRECTLY?
+ * Because content.ts would then need to import and check SKIP_TAGS,
+ * DATA_MARKER, ARABIC_TEST, and the contenteditable logic — duplicating
+ * domain knowledge that belongs in the processor. processAddedNode is the
+ * clean boundary: the observer hands us a node, we decide what to do.
+ *
+ * FOR ELEMENT NODES:
+ * Delegates to processSubtree() for a full subtree walk. The TreeWalker
+ * inside processSubtree handles all skip logic (SKIP_TAGS, contenteditable,
+ * DATA_MARKER). We only check DATA_MARKER here as an early bailout — if
+ * the added element IS one of our own spans, there is no point creating
+ * a walker just to have it immediately return FILTER_REJECT.
+ *
+ * FOR TEXT NODES:
+ * Performs the essential safety checks inline rather than creating a
+ * TreeWalker. A TreeWalker for a single text node would:
+ *   1. Create the walker object (allocation)
+ *   2. Call the filter function on the text node (one decision)
+ *   3. Return the node or not
+ *   4. Be garbage collected
+ * This is wasteful when we can make the same decision with four
+ * if-statements. The checks replicate the TreeWalker filter's logic
+ * for the parent-element level (SKIP_TAGS, contenteditable, DATA_MARKER)
+ * and the text-node level (ARABIC_TEST).
+ *
+ * FOR characterData MUTATIONS:
+ * When a framework like React changes textNode.nodeValue in place, the
+ * observer in content.ts collects that text node and passes it here.
+ * It hits the Text branch. If the NEW text contains Arabic (and the
+ * parent isn't forbidden), we wrap it. If the text node was ALREADY
+ * wrapped in one of our spans (parent has DATA_MARKER), we skip it —
+ * the Arabic text is already enlarged.
+ *
+ * EDGE CASE — characterData ON A WRAPPED TEXT NODE:
+ * If a framework mutates the nodeValue of a text node INSIDE one of
+ * our <span data-arabic-enlarger> elements, we skip it (parent has
+ * DATA_MARKER). This is correct: the text is already inside a styled
+ * span. If the framework changed it to non-Arabic text, the span
+ * still applies our CSS class, but this is an extremely rare edge case
+ * (a framework reaching inside our span to change its text), and the
+ * visual impact is negligible (non-Arabic text with a slightly larger
+ * font-size). A full solution would require detecting this case and
+ * unwrapping the span, but the complexity isn't justified by the
+ * vanishingly small probability.
+ *
+ * @param node - A Node added to or changed in the DOM. May be an
+ *               Element (childList mutation), a Text node (childList
+ *               or characterData mutation), or any other node type
+ *               (ignored).
+ */
+export function processAddedNode(node: Node): void {
+    if (node instanceof Element) {
+        // Early bailout: skip our own wrapper spans
+        if (node.hasAttribute(DATA_MARKER)) return;
+
+        // Full subtree walk — the TreeWalker handles all skip logic
+        processSubtree(node);
+
+    } else if (node instanceof Text) {
+        // For a single text node, replicate the TreeWalker's parent
+        // checks inline rather than creating a walker
+        const parent = node.parentElement;
+        if (!parent) return;
+
+        if (SKIP_TAGS.has(parent.tagName)) return;
+        if (parent.getAttribute("contenteditable") === "true") return;
+        if (parent.hasAttribute(DATA_MARKER)) return;
+
+        // Only wrap if the text actually contains Arabic
+        if (node.nodeValue && ARABIC_TEST.test(node.nodeValue)) {
+            wrapArabicRuns(node);
+        }
+    }
+}
+
 
 // ============================================================================
 // DEEP SLEEP — lightweight pre-scan
@@ -553,7 +653,7 @@ function processSubtree(root: Node): void {
  * If Arabic content exists only beyond the sample window (e.g., at the
  * bottom of a very long page), this check returns false and the initial
  * processSubtree() call is skipped. This is acceptable because:
- *   1. The MutationObserver (started by enlargeArabicText()) will catch
+ *   1. The MutationObserver (started by content.ts) will catch
  *      Arabic content when it enters the viewport / is lazily loaded.
  *   2. Pages where Arabic appears only after 10K characters of non-Arabic
  *      content are extremely rare in practice.
@@ -569,116 +669,6 @@ function pageContainsArabic(): boolean {
     return ARABIC_TEST.test(sample);
 }
 
-// ============================================================================
-// MUTATION OBSERVER — dynamic content handling
-// ============================================================================
-
-/**
- * Callback for the MutationObserver. Processes newly added DOM nodes
- * that may contain Arabic text.
- *
- * DISCONNECT/RECONNECT PATTERN
- * ----------------------------
- * The critical problem with MutationObservers that modify the DOM is
- * the feedback loop:
- *
- *   1. Page adds a <div> with Arabic text
- *   2. Observer fires, we process the <div> (adding spans)
- *   3. Our span insertions are DOM mutations
- *   4. Observer fires again for our own mutations
- *   5. We process our own spans (they contain Arabic text!)
- *   6. Infinite loop → page freezes or reloads endlessly
- *
- * This was the exact bug in Wudooh (GitHub Issue #23), which caused
- * infinite reload loops on Google Search.
- *
- * Our defense is two-layered:
- *
- *   Layer 1 (structural): Disconnect the observer before processing,
- *   reconnect after. Mutations caused by our processing are never seen.
- *
- *   Layer 2 (defensive): The TreeWalker filter rejects elements with
- *   DATA_MARKER, so even if the observer somehow fires on our own spans,
- *   the walker won't descend into them. This is a belt-and-suspenders
- *   safeguard — Layer 1 should be sufficient, but browser edge cases
- *   (microtask timing, nested observers) make the extra check worthwhile.
- *
- * @param mutations - Array of MutationRecord objects from the observer.
- */
-function handleMutations(mutations: MutationRecord[]): void {
-    // Layer 1: disconnect before any DOM modifications
-    observer!.disconnect();
-
-    for (const mutation of mutations) {
-        for (const addedNode of mutation.addedNodes) {
-
-            if (addedNode instanceof Element) {
-                // Skip our own wrapper spans (Layer 2 defense)
-                if (addedNode.hasAttribute(DATA_MARKER)) continue;
-
-                // Process the entire added subtree — it may contain Arabic
-                // text nodes at any depth
-                processSubtree(addedNode);
-
-            } else if (addedNode instanceof Text) {
-                // A raw text node was added (less common, but happens with
-                // some frameworks that manipulate text content directly)
-                const parent = addedNode.parentElement;
-                if (!parent) continue;
-
-                // Skip if the parent is in our exclusion set.
-                // We can't use the TreeWalker here (overkill for a single node),
-                // so we replicate the essential checks.
-                if (SKIP_TAGS.has(parent.tagName)) continue;
-                if (parent.getAttribute("contenteditable") === "true") continue;
-                if (parent.hasAttribute(DATA_MARKER)) continue;
-
-                // Only process if the text actually contains Arabic
-                if (addedNode.nodeValue && ARABIC_TEST.test(addedNode.nodeValue)) {
-                    wrapArabicRuns(addedNode);
-                }
-            }
-        }
-    }
-
-    // Reconnect after all modifications are complete.
-    // Any mutations caused by our processing above are already done
-    // and will NOT be observed (we were disconnected during them).
-    startObserving();
-}
-
-/**
- * Starts (or restarts) the MutationObserver on document.body.
- *
- * Configuration:
- *   - childList: true  — watch for added/removed child nodes
- *   - subtree: true    — watch the entire body, not just direct children
- *   - characterData, attributes: false (default) — we don't need these
- *
- * We observe document.body rather than document.documentElement because
- * <head> mutations (stylesheet changes, meta tags) are irrelevant to us
- * and would cause unnecessary callback invocations.
- */
-function startObserving(): void {
-    if (!observer) {
-        observer = new MutationObserver(handleMutations);
-    }
-    observer.observe(document.body, { childList: true, subtree: true });
-}
-
-/**
- * Stops the MutationObserver and releases its reference.
- *
- * Called during restoreOriginalText() — once we've unwrapped all spans,
- * we must stop observing, otherwise the observer would see our unwrapping
- * mutations and potentially attempt to process the restored text nodes.
- */
-function stopObserving(): void {
-    if (observer) {
-        observer.disconnect();
-        observer = null;
-    }
-}
 
 // ============================================================================
 // PUBLIC API
@@ -691,9 +681,8 @@ function stopObserving(): void {
  * ---------
  * 1. Idempotency guard: if already enlarged, returns immediately.
  * 2. Deep Sleep check: samples body text for Arabic characters.
- *    If none is found, sets a state flag and returns (near-zero cost).
+ *    If none found, sets state flag and returns (near-zero cost).
  * 3. Processes the entire document body, wrapping Arabic text nodes.
- * 4. Starts the MutationObserver for dynamic content.
  *
  * IDEMPOTENCY
  * -----------
@@ -702,25 +691,25 @@ function stopObserving(): void {
  * re-send the "toggle" message on tab navigation (tabs.onUpdated),
  * and without the guard, Arabic text would be wrapped in nested spans.
  *
- * DEEP SLEEP AND OBSERVER
- * -----------------------
- * Even when the Deep Sleep check finds no Arabic, we still start the
- * MutationObserver. The page may later load Arabic content dynamically
- * (AJAX, infinite scroll). The observer handles this case.
+ * OBSERVER COORDINATION
+ * ---------------------
+ * This function does NOT start the MutationObserver. The content script
+ * (content.ts) calls this function first, then starts the observer
+ * separately in activateEnlargement(). This ordering is intentional:
+ * if the observer were started before or during processing, our own
+ * span insertions would trigger it — wasted work at best, a feedback
+ * loop risk at worst.
+ *
+ * Even when the Deep Sleep check finds no Arabic, the content script
+ * still starts the observer afterwards. The page may later load Arabic
+ * content dynamically (AJAX, infinite scroll).
  */
-export function enlargeArabicText(): void {
-
-    // console.info("enlargeArabicText()");
-
+export function enlargeArabicText(skipDeepSleep = false): void {
     if (isEnlarged) return;
 
-    if (pageContainsArabic()) {
+    if (skipDeepSleep || pageContainsArabic()) {
         processSubtree(document.body);
     }
-
-    // Start observing even if Deep Sleep found no Arabic —
-    // dynamic content may contain Arabic text loaded later
-    startObserving();
 
     isEnlarged = true;
 }
@@ -731,12 +720,20 @@ export function enlargeArabicText(): void {
  * OPERATION
  * ---------
  * 1. Idempotency guard: if not enlarged, returns immediately.
- * 2. Stops the MutationObserver (must happen first — otherwise the
- *    observer would fire on our unwrapping mutations).
- * 3. Finds all wrapper spans via DATA_MARKER attribute.
- * 4. Replaces each span with a plain text node containing its text.
- * 5. Calls document.body.normalize() to merge adjacent text nodes.
- * 6. Clears CSS custom properties.
+ * 2. Finds all wrapper spans via DATA_MARKER attribute.
+ * 3. Replaces each span with a plain text node containing its text.
+ * 4. Calls document.body.normalize() to merge adjacent text nodes.
+ * 5. Clears CSS custom properties.
+ *
+ * OBSERVER COORDINATION
+ * ---------------------
+ * This function does NOT stop the MutationObserver. The content script
+ * (content.ts) stops the observer BEFORE calling this function in
+ * deactivateEnlargement(). This ordering is critical: if the observer
+ * were still connected, it would fire on our unwrapping mutations
+ * (removing spans, normalize() merging text nodes) and potentially
+ * attempt to re-process the restored text — wasteful at best, a race
+ * condition at worst.
  *
  * WHY normalize() MATTERS
  * -----------------------
@@ -774,13 +771,10 @@ export function enlargeArabicText(): void {
  */
 export function restoreOriginalText(): void {
 
-    // console.info("restoreOriginalText()");
-
     if (!isEnlarged) return;
 
-    // Stop observer FIRST — unwrapping modifies the DOM, and we don't
-    // want the observer to fire on our cleanup mutations
-    stopObserving();
+    // Observer is stopped by content.ts in deactivateEnlargement()
+    // BEFORE this function is called — no observer management here.
 
     // Find all our wrapper spans. The DATA_MARKER attribute is our sole
     // identifier — guaranteed unique, no false positives.
@@ -814,7 +808,7 @@ export function restoreOriginalText(): void {
 }
 
 /**
- * Returns whether Arabic text is currently enlarged.
+ * Returns whether the Arabic text is currently enlarged.
  *
  * Used by the content script's "query-state" message handler to report
  * the actual DOM state back to the background service worker. This is

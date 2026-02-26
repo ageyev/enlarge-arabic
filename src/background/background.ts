@@ -1,7 +1,7 @@
 // https://stackoverflow.com/questions/49996456/importing-json-file-in-typescript
 import manifest from "../../public/manifest.json";
 
-import {disabledIcon, enabledIcon} from "../constants";
+import {devMode, disabledIcon, enabledIcon} from "../constants";
 import messageType from "../messages/messageType";
 import Tab = chrome.tabs.Tab;
 import OnUpdatedInfo = chrome.tabs.OnUpdatedInfo;
@@ -30,7 +30,34 @@ chrome.action.onClicked.addListener(async (tab:Tab) => {
 
         // send a message to the content script
         const message:messageType = {action: "toggle", enabled: newState};
-        await chrome.tabs.sendMessage(tab.id, message);
+
+        try {
+            const response = await chrome.tabs.sendMessage(tab.id, message);
+
+            if (devMode){
+                console.log("sendMessage response:", response);
+            }
+
+            if (!response?.ok) throw new Error("No valid response");
+
+        } catch (error) {
+            if (devMode){
+                console.log("sendMessage failed:", error);
+            }
+
+            // Content script not yet injected — inject it programmatically
+            //  "scripting" permission is needed in manifest.json.
+            await chrome.scripting.insertCSS({
+                target: { tabId: tab.id },
+                files: ["content.css"],
+            });
+            await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                files: ["content.js"],
+            });
+            // Retry now that the script is present
+            await chrome.tabs.sendMessage(tab.id, message);
+        }
 
         // store the new state
         tabData[storageKey] = {enabled: newState};
@@ -43,7 +70,9 @@ chrome.action.onClicked.addListener(async (tab:Tab) => {
         });
 
     } else {
-        console.error("No tab.id or tab.url found");
+        if(devMode){
+            console.error("No tab.id or tab.url found");
+        }
         return;
     }
 });
