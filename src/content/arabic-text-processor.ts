@@ -691,7 +691,7 @@ function stopObserving(): void {
  * ---------
  * 1. Idempotency guard: if already enlarged, returns immediately.
  * 2. Deep Sleep check: samples body text for Arabic characters.
- *    If none found, sets state flag and returns (near-zero cost).
+ *    If none is found, sets a state flag and returns (near-zero cost).
  * 3. Processes the entire document body, wrapping Arabic text nodes.
  * 4. Starts the MutationObserver for dynamic content.
  *

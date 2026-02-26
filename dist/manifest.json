@@ -1,0 +1,30 @@
+{
+  "name": "[Enlarge Arabic]",
+  "version": "0.1.0",
+  "manifest_version": 3,
+  "description": "Chrome extension that enlarges Arabic text on any website (even inside mixed-language pages) for better readability",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [{
+    "matches": ["<all_urls>"],
+    "js": ["content.js"],
+    "css": ["app.css"],
+    "run_at": "document_idle"
+  }],
+  "action": {
+    "default_title": "[Enlarge Arabic]"
+  },
+  "icons": {
+    "16": "images/ain_enabled_teal_16.png",
+    "32": "images/ain_enabled_teal_32.png",
+    "48": "images/ain_enabled_teal_48.png",
+    "128": "images/ain_enabled_teal_128.png"
+  },
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "storage",
+    "unlimitedStorage"
+  ]
+}
