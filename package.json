@@ -1,6 +1,6 @@
 {
   "name": "enlarge-arabic",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Chrome extension that enlarges Arabic text on any website (even inside mixed-language pages) for better readability",
   "homepage": "",
   "private": true,
@@ -11,6 +11,8 @@
   "type": "module",
   "devDependencies": {
     "@types/chrome": "^0.1.37",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "copy-webpack-plugin": "^13.0.1",
     "css-loader": "^7.1.4",
     "css-minimizer-webpack-plugin": "^7.0.4",
@@ -21,5 +23,9 @@
     "typescript": "^5.9.3",
     "webpack": "^5.105.2",
     "webpack-cli": "^6.0.1"
+  },
+  "dependencies": {
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
   }
 }

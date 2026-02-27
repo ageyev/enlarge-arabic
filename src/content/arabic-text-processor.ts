@@ -129,7 +129,7 @@
 // ============================================================================
 // CONSTANTS
 // ============================================================================
-import {devMode} from "../constants";
+import {devMode} from "../shared/constants";
 
 /** Minimum target: ES2018 (guaranteed by MV3 browser requirements).
  *  Non-global — avoids lastIndex statefulness. */

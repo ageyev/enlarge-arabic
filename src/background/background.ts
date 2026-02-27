@@ -1,7 +1,7 @@
 // https://stackoverflow.com/questions/49996456/importing-json-file-in-typescript
 import manifest from "../../public/manifest.json";
 
-import {devMode, disabledIcon, enabledIcon} from "../constants";
+import {devMode, disabledIcon, enabledIcon} from "../shared/constants";
 import messageType from "../messages/messageType";
 import Tab = chrome.tabs.Tab;
 import OnUpdatedInfo = chrome.tabs.OnUpdatedInfo;

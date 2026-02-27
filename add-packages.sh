@@ -43,7 +43,9 @@ npm install --save-dev @types/chrome
 # React
 # https://react.dev/learn/add-react-to-an-existing-project
 # https://react.dev/learn/typescript#adding-typescript-to-an-existing-react-project
-#npm install react react-dom @types/react @types/react-dom
+# npm install react react-dom @types/react @types/react-dom
+npm install react react-dom
+npm install --save-dev @types/react @types/react-dom
 
 # Font Awesome for React
 # https://fontawesome.com/docs/web/use-with/react/

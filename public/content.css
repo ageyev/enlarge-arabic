@@ -1,37 +1,46 @@
 
-    /**
-     * ============================================================================
-     * Arabic Enlargement Styles — [enlarge arabic]
-     * ============================================================================
-     *
-     * This stylesheet is declared in manifest.json under content_scripts.css,
-     * which means Chrome injects it automatically alongside the content script
-     * and removes it when the extension is disabled.
-     *
-     * DESIGN PRINCIPLE: CSS custom properties as the control interface
-     * ----------------------------------------------------------------
-     * The rule structure is static — it never changes at runtime. The actual
-     * values (font-size, line-height) are controlled by CSS custom properties
-     * (--arabic-enlarger-size, --arabic-enlarger-height) that the TypeScript
-     * code sets on <html> via document.documentElement.style.setProperty().
-     *
-     * This design gives us three properties simultaneously:
-     *
-     *   1. O(1) updates: changing font-size for all Arabic spans on the page
-     *      requires exactly one setProperty() call. The browser propagates
-     *      the new value to all elements referencing the variable. Compare
-     *      with iterating over every span to update inline styles (O(n)).
-     *
-     *   2. Graceful degradation: if the extension is disabled, Chrome removes
-     *      this stylesheet. The orphaned <span class="arabic-enlarged"> elements
-     *      have no matching CSS rule, so they become invisible wrappers with
-     *      no visual effect. The page looks normal without a refresh.
-     *
-     *   3. Fallback defaults: the var() second argument (1.35em, 1.6) provides
-     *      sensible values if the TypeScript code hasn't set the properties yet
-     *      (e.g., during the brief window between CSS injection and content
-     *      script initialization).
-     */
+/**
+ * ============================================================================
+ * Arabic Enlargement Styles — [enlarge arabic]
+ * ============================================================================
+ *
+ * This stylesheet is declared in manifest.json under content_scripts.css,
+ * which means Chrome injects it automatically alongside the content script
+ * and removes it when the extension is disabled.
+ *
+ * DESIGN PRINCIPLE: CSS custom properties as the control interface
+ * ----------------------------------------------------------------
+ * The rule structure is static — it never changes at runtime. The actual
+ * values (font-size, line-height) are controlled by CSS custom properties
+ * (--arabic-enlarger-size, --arabic-enlarger-height) that the TypeScript
+ * code sets on <html> via document.documentElement.style.setProperty().
+ *
+ * This design gives us three properties simultaneously:
+ *
+ *   1. O(1) updates: changing font-size for all Arabic spans on the page
+ *      requires exactly one setProperty() call. The browser propagates
+ *      the new value to all elements referencing the variable. Compare
+ *      with iterating over every span to update inline styles (O(n)).
+ *
+ *   2. Graceful degradation: if the extension is disabled, Chrome removes
+ *      this stylesheet. The orphaned <span class="arabic-enlarged"> elements
+ *      have no matching CSS rule, so they become invisible wrappers with
+ *      no visual effect. The page looks normal without a refresh.
+ *
+ *   3. Fallback defaults: the var() second argument (1.35em, 1.6) provides
+ *      sensible values if the TypeScript code hasn't set the properties yet
+ *      (e.g., during the brief window between CSS injection and content
+ *      script initialization).
+ */
+
+/* ======================================================================== */
+
+/*
+* IMPORTANT:
+* The fallback values below (1.4em, 1.6) must match the defaults in
+* src/shared/constants.ts (DEFAULT_FONT_SIZE, DEFAULT_LINE_HEIGHT).
+* If changing one, update the other to match.
+*/
 
 .arabic-enlarged {
     font-size: var(--arabic-enlarger-size, 1.4em);

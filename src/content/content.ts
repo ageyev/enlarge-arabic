@@ -70,12 +70,45 @@
 
 // https://stackoverflow.com/questions/49996456/importing-json-file-in-typescript
 import manifest from "../../public/manifest.json";
-
 import {enlargeArabicText, processAddedNode, processSubtree, restoreOriginalText,} from "./arabic-text-processor";
 
 import messageType from "../messages/messageType";
 
+import {DEFAULT_FONT_SIZE, DEFAULT_LINE_HEIGHT, GLOBAL_SETTINGS_KEY, type GlobalSettings,} from "../shared/constants";
+
 console.info(manifest.name + " " + manifest.version + " content script started");
+
+const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
+    fontSize: DEFAULT_FONT_SIZE,
+    lineHeight: DEFAULT_LINE_HEIGHT,
+};
+
+/**
+ * Apply enlargement settings to CSS custom properties on <html>.
+ * All .arabic-enlarged spans reference these properties via var(),
+ * so the update propagates instantly — no DOM surgery needed.
+ */
+function applyGlobalSettings(settings: GlobalSettings): void {
+    document.documentElement.style.setProperty(
+        "--arabic-enlarger-size",
+        `${settings.fontSize}em`
+    );
+    document.documentElement.style.setProperty(
+        "--arabic-enlarger-height",
+        settings.lineHeight
+    );
+}
+
+/**
+ * Read global settings from storage.
+ * Returns stored values, or built-in defaults if no settings are persisted
+ * (first run, or after user clicked "Reset to defaults").
+ */
+async function loadGlobalSettings(): Promise<GlobalSettings> {
+    const result = await chrome.storage.local.get(GLOBAL_SETTINGS_KEY);
+    const stored = result[GLOBAL_SETTINGS_KEY] as GlobalSettings | undefined;
+    return stored ?? DEFAULT_GLOBAL_SETTINGS;
+}
 
 // ============================================================================
 // MUTATION OBSERVER
@@ -688,8 +721,16 @@ function installSpaNavigationDetection(): void {
  * This function's role is orchestration — ensuring the three systems
  * (processor, observer, SPA monitor) are activated in the right order.
  */
-function activateEnlargement(): void {
+let isCurrentlyEnabled = false;
+async function activateEnlargement(): Promise<void> {
+
+    // Load user's global settings (or fall back to built-in defaults).
+    const globalSettings = await loadGlobalSettings();
+    applyGlobalSettings(globalSettings);
+
     enlargeArabicText(true);  // user explicitly requested — skip Deep Sleep
+    isCurrentlyEnabled = true;
+
     startArabicObserver();
     spaMonitoringActive = true;
 }
@@ -722,8 +763,8 @@ function deactivateEnlargement(): void {
     spaMonitoringActive = false;
     stopArabicObserver();
     restoreOriginalText();
+    isCurrentlyEnabled = false;
 }
-
 
 // ============================================================================
 // MESSAGE HANDLER — communication with background service worker
@@ -734,7 +775,7 @@ chrome.runtime.onMessage.addListener((
     sender: chrome.runtime.MessageSender,
     sendResponse
 ) => {
-    console.info(message);
+    // console.info(message);
     if (message.action === "toggle") {
         if (message.enabled) {
             activateEnlargement();
@@ -819,6 +860,22 @@ async function selfInitialize(): Promise<void> {
         console.warn("[enlarge arabic] self-initialization failed:", error);
     }
 }
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== "local") return;
+
+    const settingsChange = changes[GLOBAL_SETTINGS_KEY];
+    if (!settingsChange) return;
+
+    // Only apply if the extension is currently active on this page.
+    // (Without this guard, saving settings would cause enlargement
+    // on pages where the extension is toggled off.)
+    if (!isCurrentlyEnabled) return;
+
+    // newValue is undefined when the key is deleted (user clicked Reset).
+    const newSettings = settingsChange.newValue as GlobalSettings | undefined;
+    applyGlobalSettings(newSettings ?? DEFAULT_GLOBAL_SETTINGS);
+});
 
 // ============================================================================
 // SCRIPT ENTRY POINT
