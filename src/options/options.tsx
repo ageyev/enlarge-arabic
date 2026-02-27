@@ -149,7 +149,7 @@ function OptionsPage() {
 
     return (
         <>
-            <h1>[Enlarge Arabic] — Settings</h1>
+            <h1>[Enlarge Arabic] — General Settings</h1>
 
             <div className="settings-card">
                 <h2>Enlargement</h2>
