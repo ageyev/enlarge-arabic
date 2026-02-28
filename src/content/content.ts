@@ -74,7 +74,14 @@ import {enlargeArabicText, processAddedNode, processSubtree, restoreOriginalText
 
 import messageType from "../messages/messageType";
 
-import {DEFAULT_FONT_SIZE, DEFAULT_LINE_HEIGHT, GLOBAL_SETTINGS_KEY, type GlobalSettings,} from "../shared/constants";
+import { loadEffectiveSettings } from "../shared/storage";
+
+import {
+    DEFAULT_FONT_SIZE,
+    DEFAULT_LINE_HEIGHT,
+    GLOBAL_SETTINGS_KEY,
+    type GlobalSettings,
+} from "../shared/constants";
 
 console.info(manifest.name + " " + manifest.version + " content script started");
 
@@ -88,26 +95,17 @@ const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
  * All .arabic-enlarged spans reference these properties via var(),
  * so the update propagates instantly — no DOM surgery needed.
  */
-function applyGlobalSettings(settings: GlobalSettings): void {
+function applyEnlargementSettings(settings: GlobalSettings): void {
+
     document.documentElement.style.setProperty(
         "--arabic-enlarger-size",
         `${settings.fontSize}em`
     );
+
     document.documentElement.style.setProperty(
         "--arabic-enlarger-height",
         settings.lineHeight
     );
-}
-
-/**
- * Read global settings from storage.
- * Returns stored values, or built-in defaults if no settings are persisted
- * (first run, or after user clicked "Reset to defaults").
- */
-async function loadGlobalSettings(): Promise<GlobalSettings> {
-    const result = await chrome.storage.local.get(GLOBAL_SETTINGS_KEY);
-    const stored = result[GLOBAL_SETTINGS_KEY] as GlobalSettings | undefined;
-    return stored ?? DEFAULT_GLOBAL_SETTINGS;
 }
 
 // ============================================================================
@@ -725,10 +723,20 @@ let isCurrentlyEnabled = false;
 async function activateEnlargement(): Promise<void> {
 
     // Load user's global settings (or fall back to built-in defaults).
-    const globalSettings = await loadGlobalSettings();
-    applyGlobalSettings(globalSettings);
+    // const globalSettings = await loadGlobalSettings();
+    // applyGlobalSettings(globalSettings);
+    //
+    // enlargeArabicText(true);  // user explicitly requested — skip Deep Sleep
+    // isCurrentlyEnabled = true;
 
-    enlargeArabicText(true);  // user explicitly requested — skip Deep Sleep
+    // Load effective settings: domain overrides → global → built-in defaults
+    const hostname = window.location.hostname;
+
+    const settings = await loadEffectiveSettings(hostname);
+
+    applyEnlargementSettings(settings);
+
+    enlargeArabicText(true);
     isCurrentlyEnabled = true;
 
     startArabicObserver();
@@ -769,13 +777,12 @@ function deactivateEnlargement(): void {
 // ============================================================================
 // MESSAGE HANDLER — communication with background service worker
 // ============================================================================
-
 chrome.runtime.onMessage.addListener((
-    message: messageType,
+    message,
     sender: chrome.runtime.MessageSender,
-    sendResponse
+    sendResponse,
 ) => {
-    // console.info(message);
+    // Existing toggle handler
     if (message.action === "toggle") {
         if (message.enabled) {
             activateEnlargement();
@@ -783,7 +790,32 @@ chrome.runtime.onMessage.addListener((
             deactivateEnlargement();
         }
         sendResponse({ ok: true });
-        return true; // keeps channel open
+        return true;
+    }
+
+    // ── Sidepanel: live preview ────────────────────────────────
+    // Applies temporary CSS values without touching storage.
+    // Only effective when the extension is active on this page
+    // (no .arabic-enlarged spans exist otherwise).
+    if (message.action === "preview" && isCurrentlyEnabled) {
+        applyEnlargementSettings({
+            fontSize: message.fontSize,
+            lineHeight: message.lineHeight,
+        });
+        sendResponse({ ok: true });
+        return true;
+    }
+
+    // ── Sidepanel: revert preview ──────────────────────────────
+    // Re-reads effective settings from storage and applies them,
+    // discarding any unsaved preview values.
+    if (message.action === "revertPreview" && isCurrentlyEnabled) {
+        const hostname = window.location.hostname;
+        loadEffectiveSettings(hostname).then((settings) => {
+            applyEnlargementSettings(settings);
+            sendResponse({ ok: true });
+        });
+        return true; // keeps message channel open for async sendResponse
     }
 });
 
@@ -861,20 +893,20 @@ async function selfInitialize(): Promise<void> {
     }
 }
 
+// TODO: consider removing this listener, so user will have to reload
+// the page to apply changes (less code executed on every active page).
 chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== "local") return;
-
-    const settingsChange = changes[GLOBAL_SETTINGS_KEY];
-    if (!settingsChange) return;
-
-    // Only apply if the extension is currently active on this page.
-    // (Without this guard, saving settings would cause enlargement
-    // on pages where the extension is toggled off.)
     if (!isCurrentlyEnabled) return;
 
-    // newValue is undefined when the key is deleted (user clicked Reset).
-    const newSettings = settingsChange.newValue as GlobalSettings | undefined;
-    applyGlobalSettings(newSettings ?? DEFAULT_GLOBAL_SETTINGS);
+    const hostname = window.location.hostname;
+
+    // React to changes in global settings OR this domain's settings
+    if (changes[GLOBAL_SETTINGS_KEY] || changes[hostname]) {
+        loadEffectiveSettings(hostname).then((settings) => {
+            applyEnlargementSettings(settings);
+        });
+    }
 });
 
 // ============================================================================

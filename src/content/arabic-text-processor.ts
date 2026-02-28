@@ -705,6 +705,7 @@ function pageContainsArabic(): boolean {
  * content dynamically (AJAX, infinite scroll).
  */
 export function enlargeArabicText(skipDeepSleep = false): void {
+
     if (isEnlarged) return;
 
     if (skipDeepSleep || pageContainsArabic()) {

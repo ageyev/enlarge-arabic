@@ -19,9 +19,10 @@ const path = require('path');
 module.exports = {
 
     mode: "production", // https://webpack.js.org/configuration/mode/ // TODO: change to 'production' in production
-    // mode: "development", // https://webpack.js.org/configuration/mode/
+    // mode: "development", // https://webpack.js.org/configuration/mode/r
     // https://webpack.js.org/configuration/devtool/
     // (none) - Recommended choice for production builds with maximum performance
+    devtool: false,
     // devtool: 'source-map', // Recommended choice for production builds with high quality SourceMaps
     // devtool: 'cheap-module-source-map',
     // devtool: 'eval-source-map', // Recommended choice for development builds with high quality SourceMaps << Error

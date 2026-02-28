@@ -21,6 +21,7 @@ chrome.action.onClicked.addListener(async (tab:Tab) => {
     if (tab.id && tab.url) {
 
         const storageKey:string = normalizeHostname(tab.url); // << hostname
+
         const tabData:{[key:string]:TabData} = await chrome.storage.local.get(storageKey);
 
         // The ?? operator in TypeScript is the nullish coalescing operator.
@@ -60,7 +61,9 @@ chrome.action.onClicked.addListener(async (tab:Tab) => {
         }
 
         // store the new state
-        tabData[storageKey] = {enabled: newState};
+        // but keep existing domain data (may contain fontSize, lineHeight from sidepanel)
+        tabData[storageKey] = {...tabData[storageKey],enabled: newState};
+
         await chrome.storage.local.set(tabData);
 
         // Visual feedback: swap icon or badge
@@ -77,7 +80,6 @@ chrome.action.onClicked.addListener(async (tab:Tab) => {
     }
 });
 
-
 // Tab navigation — re-applies state when the user navigates within a domain
 chrome.tabs.onUpdated.addListener(async (tabId: number, changeInfo: OnUpdatedInfo, tab:Tab) => {
     // Only act when the page has finished loading
@@ -89,7 +91,6 @@ chrome.tabs.onUpdated.addListener(async (tabId: number, changeInfo: OnUpdatedInf
     // The ?? operator in TypeScript is the nullish coalescing operator.
     // It is used to provide a default value only when the left-hand side operand is explicitly null or undefined
     const enabled:boolean = tabData[storageKey]?.enabled ?? false;
-
 
     if (enabled) {
         await chrome.tabs.sendMessage(tabId, {action: "toggle", enabled: true});
