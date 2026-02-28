@@ -11,12 +11,7 @@
  * Merge chain: domain overrides → global settings → built-in defaults.
  */
 
-import {
-    GLOBAL_SETTINGS_KEY,
-    DEFAULT_FONT_SIZE,
-    DEFAULT_LINE_HEIGHT,
-    type GlobalSettings,
-} from "./constants";
+import {DEFAULT_FONT_SIZE, DEFAULT_LINE_HEIGHT, GLOBAL_SETTINGS_KEY, type GlobalSettings,} from "./constants";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 

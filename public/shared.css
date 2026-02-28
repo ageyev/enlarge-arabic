@@ -1,14 +1,4 @@
-/*
- * [Enlarge Arabic] — Shared styles for extension pages.
- *
- * Used by: options.html, sidepanel.html (future).
- * NOT used by content scripts — those use content.css.
- *
- * Responsive via @media: adapts to narrow viewports (sidepanel,
- * split-view tabs, small screens) without context-specific classes.
- */
-
-/* ── Reset & base ───────────────────────────────────────────── */
+/* ── Reset ───────────────────────────────────────────────────── */
 
 *,
 *::before,
@@ -18,67 +8,114 @@
     padding: 0;
 }
 
+/* ── Theme: Light (default) ──────────────────────────────────── */
+
 :root {
-    --color-bg:            #fafafa;
-    --color-surface:       #ffffff;
-    --color-border:        #e0e0e0;
-    --color-text:          #1a1a1a;
-    --color-text-secondary:#5f6368;
-    --color-accent:        #1a73e8;
-    --color-accent-hover:  #1557b0;
-    --color-saved:         #188038;
-    --color-reset-bg:      #f1f3f4;
-    --color-reset-hover:   #dadce0;
+    /* Tells the browser this page supports both schemes,
+       so native UI (scrollbars, selection, form controls)
+       adapts automatically. */
+    color-scheme: light dark;
+
+    /* Surfaces */
+    --color-bg: #fafafa;
+    --color-surface: #fff;
+    --color-border: #e0e0e0;
+
+    /* Text */
+    --color-text: #1a1a1a;
+    --color-text-secondary: #5f6368;
+
+    /* Accent */
+    --color-accent: #1a73e8;
+    --color-accent-hover: #1557b0;
+
+    /* Text on accent-colored backgrounds (buttons, feedback states).
+       Light mode: white on dark blue/green.
+       Dark mode: near-black on light blue/green. */
+    --color-on-primary: #fff;
+
+    /* Feedback */
+    --color-saved: #188038;
+
+    /* Buttons */
+    --color-reset-bg: #f1f3f4;
+    --color-reset-hover: #dadce0;
+
+    /* Shared tokens */
     --radius: 8px;
     --font-body: "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
+/* ── Theme: Dark ─────────────────────────────────────────────── */
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --color-bg: #1a1a1a;
+        --color-surface: #2d2d2d;
+        --color-border: #4a4a4a;
+
+        --color-text: #e8eaed;
+        --color-text-secondary: #9aa0a6;
+
+        --color-accent: #8ab4f8;
+        --color-accent-hover: #aecbfa;
+        --color-on-primary: #202124;
+
+        --color-saved: #81c995;
+
+        --color-reset-bg: #3c4043;
+        --color-reset-hover: #5f6368;
+    }
+}
+
+/* ── Layout ──────────────────────────────────────────────────── */
+
 body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    display: flex;
     font-family: var(--font-body);
     font-size: 14px;
-    line-height: 1.5;
-    color: var(--color-text);
-    background: var(--color-bg);
-    min-height: 100vh;
-    display: flex;
     justify-content: center;
+    line-height: 1.5;
+    min-height: 100vh;
     padding: 40px 20px;
 }
 
 #root {
-    width: 100%;
     max-width: 600px;
+    width: 100%;
 }
 
-/* ── Typography ─────────────────────────────────────────────── */
+/* ── Typography ──────────────────────────────────────────────── */
 
 h1 {
+    color: var(--color-text);
     font-size: 22px;
     font-weight: 600;
     margin-bottom: 24px;
-    color: var(--color-text);
 }
 
 h2 {
+    color: var(--color-text-secondary);
     font-size: 14px;
     font-weight: 600;
-    text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: var(--color-text-secondary);
     margin-bottom: 12px;
+    text-transform: uppercase;
 }
 
-/* ── Card ───────────────────────────────────────────────────── */
+/* ── Settings card ───────────────────────────────────────────── */
 
 .settings-card {
     background: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius);
-    padding: 24px;
     margin-bottom: 20px;
+    padding: 24px;
 }
 
-/* ── Sliders ────────────────────────────────────────────────── */
+/* ── Sliders ─────────────────────────────────────────────────── */
 
 .slider-group {
     margin-bottom: 20px;
@@ -89,60 +126,60 @@ h2 {
 }
 
 .slider-label {
-    display: flex;
-    justify-content: space-between;
     align-items: baseline;
-    margin-bottom: 8px;
+    display: flex;
     font-size: 14px;
+    justify-content: space-between;
+    margin-bottom: 8px;
 }
 
 .slider-value {
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
     color: var(--color-accent);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
     min-width: 4.5em;
     text-align: right;
 }
 
 input[type="range"] {
-    width: 100%;
-    height: 6px;
-    border-radius: 3px;
-    background: var(--color-border);
-    outline: none;
-    appearance: none;
     -webkit-appearance: none;
+    appearance: none;
+    background: var(--color-border);
+    border-radius: 3px;
     cursor: pointer;
+    height: 6px;
+    outline: none;
+    width: 100%;
 }
 
 input[type="range"]::-webkit-slider-thumb {
-    appearance: none;
     -webkit-appearance: none;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
+    appearance: none;
     background: var(--color-accent);
-    cursor: pointer;
     border: 2px solid var(--color-surface);
+    border-radius: 50%;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    height: 18px;
+    width: 18px;
 }
 
 input[type="range"]::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
     background: var(--color-accent);
-    cursor: pointer;
     border: 2px solid var(--color-surface);
+    border-radius: 50%;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    height: 18px;
+    width: 18px;
 }
 
-/* ── Preview ────────────────────────────────────────────────── */
+/* ── Preview (options page) ──────────────────────────────────── */
 
 .preview-text {
+    color: var(--color-text);
     font-size: 16px;
     line-height: 1.8;
-    color: var(--color-text);
 }
 
 .preview-text p {
@@ -154,33 +191,33 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .arabic-preview {
+    color: var(--color-accent);
     font-size: var(--preview-font-size, 1.4em);
     line-height: var(--preview-line-height, 1.6);
-    color: var(--color-accent);
 }
 
-/* ── Buttons ────────────────────────────────────────────────── */
+/* ── Buttons ─────────────────────────────────────────────────── */
 
 .button-row {
     display: flex;
-    justify-content: flex-end;
     gap: 12px;
+    justify-content: flex-end;
 }
 
 .btn {
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
     font-family: var(--font-body);
     font-size: 14px;
     font-weight: 500;
     padding: 8px 20px;
-    border-radius: var(--radius);
-    border: none;
-    cursor: pointer;
     transition: background-color 0.15s ease;
 }
 
 .btn:disabled {
-    opacity: 0.7;
     cursor: default;
+    opacity: 0.7;
 }
 
 .btn-reset {
@@ -194,7 +231,7 @@ input[type="range"]::-moz-range-thumb {
 
 .btn-save {
     background: var(--color-accent);
-    color: #ffffff;
+    color: var(--color-on-primary);
     min-width: 100px;
 }
 
@@ -202,20 +239,34 @@ input[type="range"]::-moz-range-thumb {
     background: var(--color-accent-hover);
 }
 
-/* ── Feedback states (applied via data-status attribute) ──── */
-/* Hover variants are needed to override .btn-save:hover and
-   .btn-reset:hover, which have higher specificity (0,3,0)
-   than .btn[data-status] alone (0,2,0). */
-
 .btn[data-status="saved"],
 .btn[data-status="saved"]:hover,
 .btn[data-status="reset"],
 .btn[data-status="reset"]:hover {
     background: var(--color-saved);
-    color: #ffffff;
+    color: var(--color-on-primary);
 }
 
-/* ── Responsive: narrow viewports (sidepanel, split view) ─── */
+/* ── Sidepanel-specific ──────────────────────────────────────── */
+
+.sidepanel-subtitle {
+    color: var(--color-text-secondary);
+    font-size: 15px;
+    margin-bottom: 20px;
+}
+
+.sidepanel-subtitle strong {
+    color: var(--color-text);
+    font-weight: 600;
+}
+
+.info-message {
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+/* ── Responsive: narrow viewports (sidepanel, split view) ──── */
 
 @media (max-width: 420px) {
     body {
@@ -236,7 +287,7 @@ input[type="range"]::-moz-range-thumb {
     }
 
     .button-row .btn {
-        width: 100%;
         text-align: center;
+        width: 100%;
     }
 }

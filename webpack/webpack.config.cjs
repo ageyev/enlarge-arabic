@@ -12,7 +12,6 @@ const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 // https://webpack.js.org/plugins/html-minimizer-webpack-plugin/
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const HtmlMinimizerPlugin = require('html-minimizer-webpack-plugin');
-
 //
 const path = require('path');
 

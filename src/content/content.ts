@@ -72,16 +72,9 @@
 import manifest from "../../public/manifest.json";
 import {enlargeArabicText, processAddedNode, processSubtree, restoreOriginalText,} from "./arabic-text-processor";
 
-import messageType from "../messages/messageType";
+import {loadEffectiveSettings} from "../shared/storage";
 
-import { loadEffectiveSettings } from "../shared/storage";
-
-import {
-    DEFAULT_FONT_SIZE,
-    DEFAULT_LINE_HEIGHT,
-    GLOBAL_SETTINGS_KEY,
-    type GlobalSettings,
-} from "../shared/constants";
+import {DEFAULT_FONT_SIZE, DEFAULT_LINE_HEIGHT, GLOBAL_SETTINGS_KEY, type GlobalSettings,} from "../shared/constants";
 
 console.info(manifest.name + " " + manifest.version + " content script started");
 
