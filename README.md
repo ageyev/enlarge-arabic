@@ -28,11 +28,30 @@ Arabic is a cursive script where characters must join. Wrapping individual *char
 
 Click the extension icon (ﻉ) in the toolbar to toggle Arabic enlargement on the current domain. The icon turns teal when active and gray when inactive. The state is remembered per domain — once you enable it on `ar.wikipedia.org`, every visit to that domain will auto-enlarge Arabic text until you click the icon again to disable it.
 
-No popup, no settings page (yet) — a single click toggles the extension.
+### Configuring enlargement
+
+The extension provides two levels of settings:
+
+**General settings** (options page) control the global defaults — the font size and line height applied on any domain unless overridden. Open via right-click on the extension icon → "Options", or through Chrome's extension management page.
+
+**Per-domain settings** (sidepanel) let you fine-tune enlargement for specific websites. Open the Chrome sidebar and select "[Enlarge Arabic]" from the sidepanel list. The sidepanel tracks which tab is active and displays settings for the current domain. Drag the sliders to see a live preview on the page; click "Save for this site" to persist the overrides, or "Reset to global defaults" to remove them.
+
+The settings merge chain applies in this order (first defined value wins):
+
+1. Domain-specific override (from sidepanel)
+2. Global settings (from options page)
+3. Built-in defaults (1.40 em font size, 1.60 line height)
+
+Per-domain settings survive toggle cycles — disabling and re-enabling the extension on a domain restores the domain's saved settings.
+
+### Dark theme
+
+The options page and sidepanel automatically adapt to the browser's color scheme. No manual configuration is needed — the extension follows the OS-level light/dark preference.
+
 
 ## Architecture
 
-The extension implements a two-layer approach that separates visual styling from DOM manipulation.
+The extension implements a layered approach that separates visual styling from DOM manipulation and settings management.
 
 ### Layer 1: CSS custom properties
 
@@ -59,11 +78,41 @@ The processor module (`arabic-text-processor.ts`) is a pure DOM manipulation lib
 | `restoreOriginalText()` | Unwraps all spans, normalizes the DOM to its pre-enlargement state |
 | `processSubtree(root)` | Processes a specific DOM subtree (used by the MutationObserver) |
 | `processAddedNode(node)` | Processes a single added node — Element or Text (used by the observer) |
-| `applySettings(settings)` | Updates CSS custom properties — O(1) regardless of span count |
-| `clearSettings()` | Removes CSS custom properties |
 | `isCurrentlyEnlarged()` | Returns current state for synchronization with the background service worker |
 
-The content script (`content.ts`) handles orchestration: message listening, MutationObserver lifecycle, SPA navigation detection, self-initialization from storage, and state management. The background service worker (`background.ts`) handles user interaction: icon clicks, per-domain state persistence, icon badge updates, and programmatic injection fallback for pre-existing tabs.
+The content script (`content.ts`) handles orchestration: message listening (including live preview and revert messages from the sidepanel), MutationObserver lifecycle, SPA navigation detection, settings loading via the shared storage module, `storage.onChanged` listener for live updates from the options page and sidepanel, and state management. The background service worker (`background.ts`) handles user interaction: icon clicks, per-domain state persistence (using a read-merge-write pattern to preserve domain-specific enlargement overrides across toggles), icon badge updates, and programmatic injection fallback for pre-existing tabs.
+
+### Layer 3: Settings system
+
+Settings are managed through a shared storage module (`src/shared/storage.ts`) that implements the three-level merge chain. The storage schema in `chrome.storage.local`:
+
+```jsonc
+{
+    // Global settings (from options page)
+    "__global_settings__": { "fontSize": "1.40", "lineHeight": "1.60" },
+
+    // Domain with toggle state + custom overrides (from sidepanel)
+    "ar.wikipedia.org": { "enabled": true, "fontSize": "1.60", "lineHeight": "1.80" },
+
+    // Domain with toggle state only (no custom overrides — uses global defaults)
+    "example.com": { "enabled": true }
+}
+```
+
+The `loadEffectiveSettings(domain)` function reads both the global settings key and the domain key in a single storage call, then applies the merge chain. The content script calls this on activation and on revert, ensuring consistent behavior regardless of which settings surface the user interacts with.
+
+The toggle handler in `background.ts` uses a read-merge-write pattern (`{ ...existing, enabled: newState }`) rather than overwriting the domain object. This preserves `fontSize` and `lineHeight` overrides across toggle cycles — a one-line architectural decision that prevents silent data loss.
+
+### UI layer: React pages with shared components
+
+The options page and sidepanel are both React applications that share:
+
+- **`Slider.tsx`** — a labeled range slider with floating-point normalization (prevents `1.2000000000000002` from repeated 0.05 step additions)
+- **`constants.ts`** — default values, slider ranges, storage keys, and the `GlobalSettings` type
+- **`storage.ts`** — `loadEffectiveSettings()`, `loadGlobalSettings()`, and `removeDomainOverrides()`
+- **`shared.css`** — complete visual design with CSS custom properties, dark theme via `@media (prefers-color-scheme: dark)`, and responsive layout via `@media (max-width: 420px)`
+
+The sidepanel implements tab tracking using `chrome.tabs.onActivated` (tab switches) and `chrome.tabs.onUpdated` filtered by `changeInfo.url` (within-tab navigation, including SPA route changes). On tab or domain change, unsaved preview values are reverted and settings for the new domain are loaded. Live preview is debounced at 120 ms and sent to the content script via `chrome.tabs.sendMessage`.
 
 
 ## Key technical decisions
@@ -105,6 +154,16 @@ Before a full DOM traversal, the extension samples the first 10,000 characters o
 
 The 10,000-character threshold has an important edge case: on pages like Facebook where the first 10K characters are React metadata and UI chrome, the check can return `false` even when Arabic content is visible on screen. For this reason, user-initiated toggles bypass Deep Sleep (the user explicitly told us there is Arabic on the page), while only automated initialization paths use the heuristic.
 
+### Dark theme via CSS custom properties
+
+The options page and sidepanel use a single `@media (prefers-color-scheme: dark)` block in `shared.css` that overrides the CSS custom property values defined in `:root`. Because every color in the UI is referenced via `var()`, the entire theme switches with zero JavaScript — the browser handles detection, application, and live switching automatically.
+
+The dark palette follows Google's Material Design dark theme conventions. A dedicated `--color-on-primary` variable handles text-on-accent contrast inversion: in light mode, white text on dark blue buttons; in dark mode, near-black text on light blue buttons. All color pairings are WCAG 2.1 AA compliant (minimum 4.5:1 contrast ratio for normal text). The `color-scheme: light dark` declaration on `:root` ensures native UI elements (scrollbars, form controls, text selection) also adapt.
+
+### React Fragments and Chrome extension pages
+
+React Fragments (`<>...</>`) must not be used at the root level of components rendered via `createRoot` in Chrome extension pages. Fragments place their children directly into the container node as siblings; when anything external modifies the container's child list (other extensions injecting content scripts, Google Translate wrapping text nodes, Chrome's own sidepanel lifecycle), React's `removeChild` calls during reconciliation fail with `NotFoundError`. A wrapper `<div>` creates an isolated boundary that shields React's DOM operations from external interference. This is a known, unresolved React issue ([#17256](https://github.com/facebook/react/issues/17256), open since 2019) that affects all React versions from 16 through 19. The sidepanel is particularly vulnerable because Chrome injects content scripts from other installed extensions into sidepanel pages.
+
 
 ## SPA and dynamic content support
 
@@ -118,17 +177,7 @@ The defense is three-layered:
 
 1. **Disconnect before processing, reconnect after.** Mutations from span insertions are never observed.
 2. **TreeWalker `FILTER_REJECT` on `data-arabic-enlarger` elements.** Even if the observer somehow fires on our own spans, the walker will not descend into them.
-3. **`processAddedNode()` checks the marker attribute before processing.** Explicit guard at the entry point.
-
-### Debounced batch processing (Collect → Schedule → Flush)
-
-Rather than processing mutations synchronously in the observer callback (which requires disconnecting and losing concurrent page mutations), the extension splits the work into two phases:
-
-**Phase 1 — Collect** (synchronous, in the observer callback): references to added/changed nodes are pushed into a pending queue. No DOM modifications occur. The observer stays connected — no mutations are lost. A single `requestAnimationFrame` is scheduled if one isn't already pending.
-
-**Phase 2 — Flush** (in the next animation frame): `observer.takeRecords()` drains any mutations queued between the last delivery and now. The pending queue is snapshotted and cleared. The observer is disconnected, all collected nodes are processed, and the observer is reconnected.
-
-This means fifty tweets arriving via infinite scroll result in one processing pass instead of fifty separate disconnect/reconnect cycles. The window of disconnection is minimized to the synchronous processing loop — typically sub-millisecond.
+3. **Debounced batch processing.** Rather than processing each mutation record immediately, mutations are collected and processed after a brief delay. This means fifty tweets arriving via infinite scroll result in one processing pass instead of fifty separate disconnect/reconnect cycles. The window of disconnection is minimized to the synchronous processing loop — typically sub-millisecond.
 
 ### `characterData` observation
 
@@ -170,28 +219,32 @@ The CSS must be injected separately via `insertCSS` because `executeScript` only
 src/
 ├── content/
 │   ├── arabic-text-processor.ts   # Pure DOM library — no Chrome APIs
-│   └── content.ts                 # Orchestration: messages, observer, SPA detection
+│   └── content.ts                 # Orchestration: messages, observer, SPA, settings
 ├── background/
-│   └── background.ts              # Service worker: toggle logic, state persistence
-├── messages/
-│   └── messageType.ts             # Shared message type definition
-├── constants.ts                   # Shared constants (icons, dev mode flag)
+│   └── background.ts              # Service worker: toggle, state, icon management
+├── shared/
+│   ├── constants.ts               # Defaults, slider ranges, storage keys, types
+│   ├── Slider.tsx                 # Reusable labeled range slider component
+│   └── storage.ts                 # Storage read/write: merge chain, domain overrides
 ├── options/
-│   └── options.tsx                # Options page (placeholder)
+│   └── options.tsx                # Options page — global enlargement settings
 ├── sidepanel/
-│   └── sidepanel.tsx              # Side panel (placeholder)
+│   └── sidepanel.tsx              # Sidepanel — per-domain settings with live preview
+├── messages/
+│   └── messageType.ts             # Shared message type definitions
 ├── assets/                        # SVG icon sources (Inkscape and raw)
 public/
 ├── manifest.json                  # MV3 manifest
-├── content.css                    # CSS with custom property references
-├── options.html                   # Options page shell
-├── sidepanel.html                 # Side panel shell
+├── content.css                    # Injected stylesheet with CSS custom property references
+├── shared.css                     # Options/sidepanel styles (light + dark, responsive)
+├── options.html                   # Options page mount point
+├── sidepanel.html                 # Sidepanel mount point
 ├── images/                        # Rasterized icons (16/32/48/128 px)
 webpack/
 └── webpack.config.cjs             # Webpack build configuration
 ```
 
-The separation between `arabic-text-processor.ts` (pure DOM) and `content.ts` (Chrome API orchestration) is deliberate: the processor is testable in any DOM environment without mocking Chrome APIs.
+The separation between `arabic-text-processor.ts` (pure DOM) and `content.ts` (Chrome API orchestration) is deliberate: the processor is testable in any DOM environment without mocking Chrome APIs. Similarly, the `src/shared/` modules contain no UI — they are consumed by both the options page and the sidepanel, enforcing consistent behavior across settings surfaces.
 
 
 ## Manifest permissions
@@ -199,9 +252,10 @@ The separation between `arabic-text-processor.ts` (pure DOM) and `content.ts` (C
 | Permission | Reason |
 |------------|--------|
 | `scripting` | Programmatic injection of content script and CSS into pre-existing tabs |
-| `tabs` | Access to `tab.url` in the `tabs.onUpdated` listener for per-domain state lookup and icon management |
+| `tabs` | Access to `tab.url` for per-domain state lookup, icon management, and sidepanel tab tracking |
 | `activeTab` | Grants temporary host permission for `scripting.executeScript` / `insertCSS` on the active tab when the user clicks the icon |
-| `storage` | Per-domain toggle state persistence via `chrome.storage.local` |
+| `storage` | Per-domain toggle state and enlargement settings persistence via `chrome.storage.local` |
+| `sidePanel` | Registers the sidepanel for per-domain settings with live preview |
 
 
 ## Competitive landscape
@@ -216,7 +270,7 @@ Research into 15+ existing extensions revealed a consistent pattern of limitatio
 | Pak Urdu Nastaleeq | Text-node wrapping | Nastaliq-specific; has the Deep Sleep concept we adopted |
 | Fontiran | Font injection | Persian-specific |
 
-No existing extension combines text-node-level precision with robust MutationObserver handling and MV3 compliance.
+No existing extension combines text-node-level precision with robust MutationObserver handling, per-domain configurable settings, and MV3 compliance.
 
 
 ## Building and development
@@ -226,7 +280,7 @@ npm install
 npm run build
 ```
 
-Load the `dist/` directory as an unpacked extension in `chrome://extensions` with Developer Mode enabled.
+Load the `dist/` directory as an unpacked extension in `chrome://extensions` with Developer Mode enabled. The `webpack.config.cjs` must include `devtool: false` (or `'source-map'`) — webpack's default `eval` strategy in development mode violates Chrome extensions' Content Security Policy.
 
 During development, after reloading the extension, you must also reload any open tabs where you want to test — otherwise orphaned content scripts from the previous load will intercept messages without functioning correctly. The programmatic injection fallback (described above) mitigates this for fresh clicks, but already-active enlargement on open tabs will stop working until the tab is reloaded.
 
@@ -242,8 +296,10 @@ The extension targets Chrome (Manifest V3) as the primary platform. The core DOM
 | TreeWalker | All | All | All | All |
 | CSS custom properties | 49+ | 31+ | 9.1+ | 15+ |
 | MutationObserver | 26+ | 14+ | 7+ | 12+ |
+| `prefers-color-scheme` | 76+ | 67+ | 12.1+ | 79+ |
+| Side Panel API | 114+ | — | — | 114+ |
 
 
 ## License
 
-[MIT](LICENSE.md) — Copyright (c) 2026 [Viktor Ageyev](https://github.com/ageyev)
+[MIT](LICENSE.md) — Copyright (c) 2026 [Viktor Ageyev](https://github.com/ageyev) 
