@@ -1,10 +1,18 @@
 # [Enlarge Arabic]
 
-A Chrome extension that selectively enlarges Arabic script on web pages without affecting surrounding text in other scripts.
+A Chrome extension that selectively enlarges Arabic script on web pages without affecting surrounding text in other scripts. 
 
-**Repository:** [github.com/ageyev/enlarge-arabic](https://github.com/ageyev/enlarge-arabic)
+![Screenshot](src/assets/screenshots/before_and_after.png) 
 
-## The problem
+## How to install:
+
+(1) from [Chrome Web Store](https://chromewebstore.google.com/detail/enlarge-arabic/cohiboahimednknkffilddeindcgpiop)
+
+(2) minified version from [GitHub Releases](https://github.com/ageyev/enlarge-arabic/releases) - download .zip file, unzip, and "Load unpacked" on the Chrome [Extensions page](chrome://extensions/)
+
+(3) from source code: use the [dist/](dist) directory in the repository for "Load unpacked" on the Chrome [Extensions page](chrome://extensions/)
+
+## Why is it necessary?
 
 Arabic glyphs at the same CSS `font-size` as Latin glyphs appear roughly 25–35 % smaller perceptually. Arabic typefaces allocate most of their vertical space to diacritics, ligatures, and deep descenders (letters like ع, ی, ر), leaving less room for the letter bodies themselves. On multilingual pages — Wikipedia, Facebook, news sites, academic papers — Arabic text becomes noticeably harder to read next to Latin, Hebrew, or CJK content.
 
