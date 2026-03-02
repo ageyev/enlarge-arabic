@@ -8,9 +8,10 @@ A Chrome extension that selectively enlarges Arabic script on web pages without 
 
 (1) from [Chrome Web Store](https://chromewebstore.google.com/detail/enlarge-arabic/cohiboahimednknkffilddeindcgpiop)
 
-(2) minified version from [GitHub Releases](https://github.com/ageyev/enlarge-arabic/releases) - download .zip file, unzip, and use the "Load unpacked" options on the Chrome [Extensions page](chrome://extensions/)
+(2) minified version from [GitHub Releases](https://github.com/ageyev/enlarge-arabic/releases) - download .zip file, unzip, and use the "Load unpacked" option on the Chrome Extensions page (⋮ → Extensions → Manage Extensions) with Developer Mode enabled on that page.
 
-(3) load the extension from the [dist/](dist) directory using the "Load unpacked" option on the Chrome [Extensions page](chrome://extensions/) 
+(3) build from source: clone the repository, run `npm install && npm run build`,
+then load the `dist/` directory using "Load unpacked" as described above.
 
 ## Why is it necessary?
 
