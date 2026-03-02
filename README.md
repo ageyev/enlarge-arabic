@@ -151,7 +151,7 @@ The extension uses `NodeFilter.SHOW_ALL` (not `SHOW_TEXT`) so that the filter fu
 
 This is fundamentally more efficient than `SHOW_TEXT` with per-node ancestor checks (`closest()`, `parentElement.tagName`). A single `FILTER_REJECT` on a `<script>` element prunes its entire subtree in one decision, whereas a `SHOW_TEXT` walker would descend into the subtree and reject each text node individually.
 
-The `contenteditable` exclusion is critical: modifying text nodes inside editable regions causes cursor positioning bugs (documented in [Wudooh Issue #15](https://github.com/nicholasbrower/Wudooh/issues/15)).
+The `contenteditable` exclusion is critical: modifying text nodes inside editable regions causes cursor positioning bugs (documented in [Wudooh Issue #15](https://github.com/basshelal/Wudooh/issues/15)).
 
 ### Two-pass processing (collect then mutate)
 
@@ -180,7 +180,7 @@ Modern web pages load content dynamically. A `MutationObserver` watches for adde
 
 ### Infinite loop prevention (Wudooh Issue #23)
 
-The critical problem with MutationObservers that modify the DOM is the feedback loop: the observer fires → we insert spans → our insertions are mutations → the observer fires again → infinite loop. This exact bug caused infinite reload loops in Wudooh on Google Search ([Issue #23](https://github.com/nicholasbrower/Wudooh/issues/23)).
+The critical problem with MutationObservers that modify the DOM is the feedback loop: the observer fires → we insert spans → our insertions are mutations → the observer fires again → infinite loop. This exact bug caused infinite reload loops in Wudooh on Google Search ([Issue #23](https://github.com/basshelal/Wudooh/issues/23)).
 
 The defense is three-layered:
 
@@ -273,7 +273,7 @@ Research into 15+ existing extensions revealed a consistent pattern of limitatio
 
 | Extension | Approach | Key limitation |
 |-----------|----------|----------------|
-| Wudooh | Element-level CSS | Infinite reload loops ([#23](https://github.com/nicholasbrower/Wudooh/issues/23)), breaks mixed-language text |
+| Wudooh | Element-level CSS | Infinite reload loops ([#23](https://github.com/basshelal/Wudooh/issues/23)), breaks mixed-language text |
 | Huruf | Element-level CSS | No dynamic content support |
 | FontARA | Font substitution | Overrides page fonts entirely |
 | Pak Urdu Nastaleeq | Text-node wrapping | Nastaliq-specific; has the Deep Sleep concept we adopted |
