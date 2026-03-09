@@ -614,6 +614,12 @@ export function processAddedNode(node: Node): void {
         // Early bailout: skip our own wrapper spans
         if (node.hasAttribute(DATA_MARKER)) return;
 
+        // added in ver. 1.0.1:
+        // Check whether this element is inside a contenteditable region.
+        // The TreeWalker inside processSubtree starts at THIS node, so it
+        // never sees contenteditable ancestors above it.
+        if (node.closest('[contenteditable="true"]')) return;
+
         // Full subtree walk — the TreeWalker handles all skip logic
         processSubtree(node);
 
@@ -624,7 +630,16 @@ export function processAddedNode(node: Node): void {
         if (!parent) return;
 
         if (SKIP_TAGS.has(parent.tagName)) return;
-        if (parent.getAttribute("contenteditable") === "true") return;
+
+        // before ver. 1.0.1:
+        // if (parent.getAttribute("contenteditable") === "true") return;
+
+        // added in ver. 1.0.1:
+        // Check the full ancestor chain, not just the immediate parent.
+        // Text nodes inside <p> inside <div contenteditable="true"> would
+        // otherwise pass — the immediate parent <p> has no contenteditable.
+        if (parent.closest('[contenteditable="true"]')) return;
+
         if (parent.hasAttribute(DATA_MARKER)) return;
 
         // Only wrap if the text actually contains Arabic
